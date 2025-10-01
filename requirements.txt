@@ -9,3 +9,4 @@ python-multipart==0.0.20
 pydantic==2.11.4
 pydantic-settings==2.2.1
 rich==14.0.0
+azure-functions==1.18.0

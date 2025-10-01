@@ -4,7 +4,7 @@ metadata:
 infra:
   path: ./infra
 services:
-  web:
-    project: .
+  api:
+    project: ./api
     language: python
-    host: appservice
+    host: function

@@ -1,83 +1,53 @@
-@description('The location used for all resources')
-param location string = resourceGroup().location
-
-@description('Name used for the deployment environment')
-param environmentName string
-
-@description('Unique suffix for naming resources')
-param resourceToken string = uniqueString(resourceGroup().id, environmentName)
-
-@description('Tags that will be applied to all resources')
-param tags object = {
-  'azd-env-name': environmentName
-}
-
-@description('Principal ID of the user running the deployment (for role assignments)')
-param userPrincipalId string = ''
-
 // ----------------------------------------------------
-// App Service and configuration
+// Azure Function App (Python)
 // ----------------------------------------------------
 
-@description('Name of the App Service for hosting the Python FastAPI app')
-param appServiceName string = 'app-${resourceToken}'
+@description('Name of the Function App')
+param functionAppName string = 'func-${resourceToken}'
 
-@description('App Service Plan SKU')
+@description('Function App Plan SKU')
 @allowed([
-  'B1'
-  'B2'
-  'B3'
-  'S1'
-  'S2'
-  'S3'
-  'P1v2'
-  'P2v2'
-  'P3v2'
+  'Y1' // Consumption
+  'EP1' // Premium
 ])
-param appServicePlanSku string = 'S1'
+param functionAppPlanSku string = 'Y1'
 
-// Create App Service Plan
-resource appServicePlan 'Microsoft.Web/serverfarms@2022-03-01' = {
-  name: 'plan-${resourceToken}'
+// Create a server farm (App Service Plan) for the Function App
+resource functionAppPlan 'Microsoft.Web/serverfarms@2022-03-01' = {
+  name: 'plan-func-${resourceToken}'
   location: location
-  tags: tags
   sku: {
-    name: appServicePlanSku
+    name: functionAppPlanSku
+    tier: functionAppPlanSku == 'Y1' ? 'Dynamic' : 'ElasticPremium'
   }
-  kind: 'linux'
+  kind: 'functionapp'
   properties: {
     reserved: true
   }
+  tags: tags
 }
 
-// Create App Service
-resource appService 'Microsoft.Web/sites@2022-03-01' = {
-  name: appServiceName
+// Create the Function App
+resource functionApp 'Microsoft.Web/sites@2022-03-01' = {
+  name: functionAppName
   location: location
-  tags: union(tags, {
-    'azd-service-name': 'web'  // Add tag required by azd for deployment
-  })
+  kind: 'functionapp,linux'
   identity: {
-    type: 'SystemAssigned' // Add system-assigned managed identity for App Service
+    type: 'SystemAssigned'
   }
   properties: {
-    serverFarmId: appServicePlan.id
+    serverFarmId: functionAppPlan.id
     httpsOnly: true
     siteConfig: {
-      // Configure Linux with Python 3.12
-      linuxFxVersion: 'PYTHON|3.12'
-      alwaysOn: true
-      // Required by FastAPI: start Gunicorn with Uvicorn workers
-      appCommandLine: 'gunicorn -w 2 -k uvicorn.workers.UvicornWorker -b 0.0.0.0:8000 main:app'
-      // Enable application logging
-      httpLoggingEnabled: true
-      detailedErrorLoggingEnabled: true
-      requestTracingEnabled: true
-      logsDirectorySizeLimit: 35
+      linuxFxVersion: 'Python|3.12'
       appSettings: [
         {
-          name: 'SCM_DO_BUILD_DURING_DEPLOYMENT'
-          value: 'true'
+          name: 'FUNCTIONS_WORKER_RUNTIME'
+          value: 'python'
+        }
+        {
+          name: 'WEBSITE_RUN_FROM_PACKAGE'
+          value: '1'
         }
         {
           name: 'AZURE_OPENAI_ENDPOINT'
@@ -106,7 +76,27 @@ resource appService 'Microsoft.Web/sites@2022-03-01' = {
       ]
     }
   }
+  tags: union(tags, {
+    'azd-service-name': 'function'
+  })
 }
+@description('The location used for all resources')
+param location string = resourceGroup().location
+
+@description('Name used for the deployment environment')
+param environmentName string
+
+@description('Unique suffix for naming resources')
+param resourceToken string = uniqueString(resourceGroup().id, environmentName)
+
+@description('Tags that will be applied to all resources')
+param tags object = {
+  'azd-env-name': environmentName
+}
+
+@description('Principal ID of the user running the deployment (for role assignments)')
+param userPrincipalId string = ''
+
 
 // ----------------------------------------------------
 // Azure OpenAI service
@@ -301,16 +291,6 @@ resource chunksContainer 'Microsoft.Storage/storageAccounts/blobServices/contain
 // Role assignments
 // ----------------------------------------------------
 
-// Assign 'Cognitive Services OpenAI User' role to App Service to call OpenAI
-resource appServiceOpenAIUserRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
-  name: guid(appService.id, openAiAccount.id, 'Cognitive Services OpenAI User')
-  scope: openAiAccount
-  properties: {
-    principalId: appService.identity.principalId
-    principalType: 'ServicePrincipal'
-    roleDefinitionId: subscriptionResourceId('Microsoft.Authorization/roleDefinitions', '5e0bd9bd-7b93-4f28-af87-19fc36ad61bd') // Cognitive Services OpenAI User
-  }
-}
 
 // Assign 'Search Index Data Reader' role to OpenAI to query search data
 resource openAISearchDataReaderRoleAssignment 'Microsoft.Authorization/roleAssignments@2022-04-01' = {
@@ -408,43 +388,3 @@ resource logAnalyticsWorkspace 'Microsoft.OperationalInsights/workspaces@2022-10
   }
 }
 
-// Configure diagnostic settings for the App Service
-resource appServiceDiagnostics 'Microsoft.Insights/diagnosticSettings@2021-05-01-preview' = {
-  scope: appService
-  name: 'appServiceDiagnostics'
-  properties: {
-    workspaceId: logAnalyticsWorkspace.id
-    logs: [
-      {
-        category: 'AppServiceHTTPLogs'
-        enabled: true
-      }
-      {
-        category: 'AppServiceConsoleLogs'
-        enabled: true
-      }
-      {
-        category: 'AppServiceAppLogs'
-        enabled: true
-      }
-      {
-        category: 'AppServiceAuditLogs'
-        enabled: true
-      }
-      {
-        category: 'AppServiceIPSecAuditLogs'
-        enabled: true
-      }
-      {
-        category: 'AppServicePlatformLogs'
-        enabled: true
-      }
-    ]
-    metrics: [
-      {
-        category: 'AllMetrics'
-        enabled: true
-      }
-    ]
-  }
-}
