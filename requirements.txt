@@ -10,3 +10,6 @@ pydantic==2.11.4
 pydantic-settings==2.2.1
 rich==14.0.0
 azure-functions==1.18.0
+
+botbuilder-core==4.14.4
+botbuilder-schema==4.14.4
