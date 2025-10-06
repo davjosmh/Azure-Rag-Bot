@@ -1,0 +1,42 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.16/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.16",
+  "version": "1.0.0",
+  "id": "92bc3ead-9f2c-4d71-a58e-2015571d3410",
+  "packageName": "com.contoso.ragbot",
+  "developer": {
+    "name": "Contoso",
+    "websiteUrl": "https://www.contoso.com",
+    "privacyUrl": "https://www.contoso.com/privacy",
+    "termsOfUseUrl": "https://www.contoso.com/terms"
+  },
+  "name": {
+    "short": "RAG Bot",
+    "full": "RAG Bot para Teams"
+  },
+  "description": {
+    "short": "Bot de RAG con Azure OpenAI y Search",
+    "full": "Bot de Recuperación aumentada con Azure OpenAI y Azure Cognitive Search, integrado en Teams."
+  },
+  "icons": {
+    "color": "color.png",
+    "outline": "outline.png"
+  },
+  "accentColor": "#0066FF",
+  "bots": [
+    {
+      "botId": "92bc3ead-9f2c-4d71-a58e-2015571d3410",
+      "scopes": ["personal", "team", "groupchat"],
+      "supportsFiles": false,
+      "isNotificationOnly": false
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [
+    "ngrok.io",
+    "azurewebsites.net"
+  ]
+}

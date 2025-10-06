@@ -30,6 +30,13 @@ class SearchSettings(BaseModel):
 
 class AppSettings(BaseSettings):
     """Application settings with environment variable loading capabilities"""
+    # Microsoft Bot Framework Settings
+    microsoft_app_id: str = Field("", env="MicrosoftAppId")
+    microsoft_app_password: str = Field("", env="MicrosoftAppPassword")
+
+    # Permitir pruebas locales sin JWT
+    allow_local_tests: int = Field(1, env="ALLOW_LOCAL_TESTS")
+    
     # Azure OpenAI Settings
     azure_openai_endpoint: str = Field(..., env="AZURE_OPENAI_ENDPOINT")
     azure_openai_gpt_deployment: str = Field(..., env="AZURE_OPENAI_GPT_DEPLOYMENT")
@@ -55,6 +62,7 @@ class AppSettings(BaseSettings):
         env_nested_delimiter = "__"
         # Setting env_priority to True prioritizes environment variables over .env file
         env_priority = True
+        extra = "allow"  # Eliminado para validación estricta
     
     @property
     def openai(self) -> OpenAISettings:

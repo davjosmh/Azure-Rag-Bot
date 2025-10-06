@@ -54,7 +54,7 @@ class RagChatService:
         
         logger.info("RagChatService initialized with environment variables")
     
-    async def get_chat_completion(self, history: List[ChatMessage]):
+    async def get_chat_completion(self, user_message: str = None, conversation_history: List[ChatMessage] = None):
         """
         Process a chat completion request with RAG capabilities by integrating with Azure AI Search
         
@@ -65,29 +65,36 @@ class RagChatService:
         4. Returns the response with citations to source documents
         
         Args:
-            history: List of chat messages from the conversation history
+            user_message: Current user message (optional, for direct message handling)
+            conversation_history: List of chat messages from the conversation history (optional)
             
         Returns:
-            Raw response from the OpenAI API with citations from Azure AI Search
+            Dict with message content and metadata from Azure AI Search
         """
         try:
-            # Limit chat history to the 20 most recent messages to prevent token limit issues
-            recent_history = history[-20:] if len(history) > 20 else history
-            
-            # Convert to Azure OpenAI compatible message format
-            messages = []
-            
-            # Add system message
-            messages.append({
+            # Initialize messages with system prompt
+            messages = [{
                 "role": "system", 
                 "content": self.system_prompt
-            })
+            }]
             
-            # Add conversation history
-            for msg in recent_history:
+            # Add conversation history if provided
+            if conversation_history:
+                # Limit chat history to the 20 most recent messages to prevent token limit issues
+                recent_history = conversation_history[-20:] if len(conversation_history) > 20 else conversation_history
+                
+                # Add conversation history
+                for msg in recent_history:
+                    messages.append({
+                        "role": msg.role,
+                        "content": msg.content
+                    })
+            
+            # Add current user message if provided
+            if user_message:
                 messages.append({
-                    "role": msg.role,
-                    "content": msg.content
+                    "role": "user",
+                    "content": user_message
                 })
             
             # Configure Azure AI Search data source according to the "On Your Data" pattern
@@ -125,8 +132,18 @@ class RagChatService:
                 stream=False
             )
             
-            # Return the raw response
-            return response
+            # Extract the message content and return formatted response
+            if response.choices and len(response.choices) > 0:
+                message_content = response.choices[0].message.content
+                return {
+                    "message": message_content,
+                    "citations": getattr(response.choices[0].message, 'context', {}).get('citations', []) if hasattr(response.choices[0].message, 'context') else []
+                }
+            else:
+                return {
+                    "message": "No pude generar una respuesta.",
+                    "citations": []
+                }
             
         except Exception as e:
             logger.error(f"Error in get_chat_completion: {str(e)}")
